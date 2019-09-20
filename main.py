@@ -5,7 +5,7 @@ from direct.interval.IntervalGlobal import Sequence
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
-from panda3d.core import Vec2
+from panda3d.core import Vec2, Vec3
 
 import commandmgr
 
@@ -27,9 +27,6 @@ class TheWorld(ShowBase):
         self.scene.setScale(0.25, 0.25, 0.25)
         self.scene.setPos(-8, 42, 0)
 
-        # Add the spinCameraTask procedure to the task manager.
-        self.taskMgr.add(self.spinCameraTask, "SpinCameraTask")
-
         self.cube = self.loader.loadModel("cuby.gltf")
         self.cube.reparentTo(self.render)
 
@@ -42,39 +39,13 @@ class TheWorld(ShowBase):
         self.panda_stater = Stater(self.pandaActor)
         self.panda_mover = Mover(self.pandaActor, self.panda_stater)
 
-        self.taskMgr.add(self.panda_mover.execute, "moveTask")
-        # Loop its animation.
-        # self.pandaActor.loop("walk")
+        self.taskMgr.add(self.panda_mover.execute, "movePandaTask")
+        self.taskMgr.add(self.move_cam, "moveCameraTask")
 
-        # Create the four lerp intervals needed for the panda to
-        # walk back and forth.
-        # interval_duration = 2
-        # pandaPosInterval1 = self.pandaActor.posInterval(interval_duration,
-        #                                                 Point3(0, -10, 5),
-        #                                                 startPos=Point3(0, 10, 0))
-        # pandaPosInterval2 = self.pandaActor.posInterval(interval_duration,
-        #                                                 Point3(0, 10, 0),
-        #                                                 startPos=Point3(0, -10, 5))
-        # pandaHprInterval1 = self.pandaActor.hprInterval(1,
-        #                                                 Point3(90, 0, 0),
-        #                                                 startHpr=Point3(0, 0, 0))
-        # pandaHprInterval2 = self.pandaActor.hprInterval(1,
-        #                                                 Point3(0, 0, 0),
-        #                                                 startHpr=Point3(90, 0, 0))
-        #
-        # # Create and play the sequence that coordinates the intervals.
-        # self.pandaPace = Sequence(pandaPosInterval1,
-        #                           pandaHprInterval1,
-        #                           pandaPosInterval2,
-        #                           pandaHprInterval2,
-        #                           name="pandaPace")
-        # self.pandaPace.loop()
-
-    def spinCameraTask(self, task):
-        angle_degrees = task.time * 6.0
-        angle_radians = angle_degrees * (pi / 180.0)
-        self.camera.setPos(20 * sin(angle_radians), -20.0 * cos(angle_radians), 3)
-        self.camera.setHpr(angle_degrees, 0, 0)
+    def move_cam(self, task):
+        v_behind = Vec3(0, 25, 10)
+        self.camera.setPos(self.pandaActor.getPos() + v_behind)
+        self.camera.lookAt(self.pandaActor)
         return Task.cont
 
 
