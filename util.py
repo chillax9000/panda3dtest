@@ -1,4 +1,6 @@
-from panda3d.core import WindowProperties
+from panda3d.core import WindowProperties, Vec2
+
+VEC2_NULL = Vec2(0, 0)
 
 
 def hidden_relative_mouse(base):
