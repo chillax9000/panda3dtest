@@ -1,3 +1,6 @@
+import sys
+
+
 class TheWorldCommandMgr:
     def __init__(self, the_world):
         self.mapping = {
@@ -10,6 +13,7 @@ class TheWorldCommandMgr:
             "arrow_down-up": self.arrow_down_released,
             "arrow_left-up": self.arrow_left_released,
             "arrow_right-up": self.arrow_right_released,
+            "escape": self.escape,
         }
         self.the_world = the_world
 
@@ -39,3 +43,6 @@ class TheWorldCommandMgr:
 
     def arrow_down_released(self):
         self.the_world.panda_stater.stop_walk("back")
+
+    def escape(self):
+        sys.exit(0)

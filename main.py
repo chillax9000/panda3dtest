@@ -1,26 +1,32 @@
-from math import pi, cos, sin
+from math import pi, sin, cos
 
 from direct.actor.Actor import Actor
-from direct.interval.IntervalGlobal import Sequence
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
 from panda3d.core import Vec2, Vec3
 
 import commandmgr
+import util
 
 
 class TheWorld(ShowBase):
     def __init__(self):
         ShowBase.__init__(self)
+        self.params = {
+            "mouse_x": 0,
+            "mouse_y": 0,
+        }
 
         self.disableMouse()
+        util.hidden_relative_mouse(self)
         self.cmd_mgr = commandmgr.TheWorldCommandMgr(self)
         for cmd_str, cmd_fn in self.cmd_mgr.mapping.items():
             self.accept(cmd_str, cmd_fn)
 
         # Load the environment model.
         self.scene = self.loader.loadModel("models/environment")
+        self.setBackgroundColor(0.53, 0.80, 0.92, 1)
         # Reparent the model to render.
         self.scene.reparentTo(self.render)
         # Apply scale and position transforms on the model.
@@ -37,15 +43,24 @@ class TheWorld(ShowBase):
         self.pandaActor.reparentTo(self.render)
 
         self.panda_stater = Stater(self.pandaActor)
-        self.panda_mover = Mover(self.pandaActor, self.panda_stater)
+        self.panda_mover = Mover(self, self.pandaActor, self.panda_stater)
 
+        self.camera.wrtReparentTo(self.pandaActor)
+        self.camera.setPos(0, 4000, 1000)
+        self.camera.lookAt(0, 0, 0)
+
+        self.taskMgr.add(self.update_params, "paramsTask")
         self.taskMgr.add(self.panda_mover.execute, "movePandaTask")
-        self.taskMgr.add(self.move_cam, "moveCameraTask")
+        self.taskMgr.add(self.log, "logTask")
 
-    def move_cam(self, task):
-        v_behind = Vec3(0, 25, 10)
-        self.camera.setPos(self.pandaActor.getPos() + v_behind)
-        self.camera.lookAt(self.pandaActor)
+    def update_params(self, task):
+        if self.mouseWatcherNode.hasMouse():
+            self.params["mouse_x"] = self.mouseWatcherNode.getMouseX()
+            self.params["mouse_y"] = self.mouseWatcherNode.getMouseY()
+            self.win.movePointer(0, self.win.getProperties().getXSize() // 2, self.win.getProperties().getYSize() // 2)
+        return Task.cont
+
+    def log(self, task):
         return Task.cont
 
 
@@ -82,10 +97,11 @@ VEC2_NULL = Vec2(0, 0)
 
 
 class Mover:
-    def __init__(self, obj, stater):
+    def __init__(self, world, obj, stater):
+        self.world = world
         self.obj = obj
         self.stater = stater
-        self.cf_front = 500
+        self.cf_front = 1000
 
     def straight_walk(self, dt):
         v_dir = sum(self.stater.states["walk"], VEC2_NULL)
@@ -94,11 +110,18 @@ class Mover:
         if v_dir.y:  # right/left
             self.obj.setX(self.obj, - v_dir.y * self.cf_front * dt)
 
+    def turn(self, dt):
+        if self.world.mouseWatcherNode.hasMouse():
+            if self.world.params["mouse_x"]:
+                self.obj.setH(self.obj.getH() - 1000 * dt * self.world.params["mouse_x"])
+
     def execute(self, task):
         dt = globalClock.getDt()
         if self.stater.states["walk"]:
             self.straight_walk(dt)
+        self.turn(dt)
         return Task.cont
+
 
 app = TheWorld()
 app.run()
