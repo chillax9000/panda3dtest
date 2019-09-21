@@ -1,7 +1,7 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
-from panda3d.core import Vec2, Vec3, AmbientLight, DirectionalLight, PointLight, NodePath, PandaNode
+from panda3d.core import Vec2, Vec3, AmbientLight, DirectionalLight, PointLight, NodePath, PandaNode, Material
 
 import commandmgr
 import util
@@ -27,13 +27,12 @@ class TheWorld(ShowBase):
 
         # environment
         self.setBackgroundColor(.0, .0, .0, 1)
-        self.scene = self.loader.loadModel("cuby.gltf")
-        self.scene.setColor(0, 0, 1, 1)
+        self.ground = self.loader.loadModel("cuby.gltf")
+        self.ground.setColor(1, 1, 1, 1)
+        self.ground.reparentTo(self.render)
 
-        self.scene.reparentTo(self.render)
-
-        self.scene.setScale(16, 16, 1)
-        self.scene.setZ(-2)
+        self.ground.setScale(16, 16, 1)
+        self.ground.setZ(-2)
 
         # lighting
         ambient_light = AmbientLight("ambient_light")
@@ -41,23 +40,20 @@ class TheWorld(ShowBase):
         alight = self.render.attachNewNode(ambient_light)
         self.render.setLight(alight)
 
-        d, h = 16, 10
-        self.basic_point_light((-d, 0, h), (.0, .0, .7, 1), "left_light")
-        self.basic_point_light((d, 0, h), (.0, .7, 0, 1), "right_light")
-        self.basic_point_light((0, d, h), (.7, .0, .0, 1), "front_light")
-        self.basic_point_light((0, -d, h), (1, 1, 1, 1), "back_light")
-
-        # directionalLight = DirectionalLight("directionalLight")
-        # directionalLight.setDirection((-5, -5, -5))
-        # directionalLight.setColor((1, 1, 1, 1))
-        # directionalLight.setSpecularColor((1, 1, 1, 1))
-        # self.render.setLight(self.render.attachNewNode(directionalLight))
-
         # actor
         self.actor = self.loader.loadModel("cuby.gltf")
         self.actor.setColor(cube_color)
         self.actor.reparentTo(self.render)
         self.actor.setPos(initial_actor_pos)
+
+        self.centerlight_np = self.actor.attachNewNode("basiclightcenter")
+        self.centerlight_np.hprInterval(4, (360, 0, 0)).loop()
+
+        d, h = 2, 0
+        self.basic_point_light((-d, 0, h), (.0, .0, .7, 1), "left_light")
+        self.basic_point_light((d, 0, h), (.0, .7, 0, 1), "right_light")
+        self.basic_point_light((0, d, h), (.7, .0, .0, 1), "front_light")
+        self.basic_point_light((0, -d, h), (1, 1, 1, 1), "back_light")
 
         self.actor_stater = Stater(self.actor)
         self.cmd_mgr.set_actor_stater(self.actor_stater)
@@ -71,6 +67,8 @@ class TheWorld(ShowBase):
         self.taskMgr.add(self.actor_mover.execute, "moveTask")
         self.taskMgr.add(self.log, "logTask")
 
+        self.render.setShaderAuto()
+
     def update_params(self, task):
         if self.mouseWatcherNode.hasMouse():
             self.params["mouse_x"] = self.mouseWatcherNode.getMouseX()
@@ -82,18 +80,22 @@ class TheWorld(ShowBase):
     def log(self, task):
         return Task.cont
 
-    def basic_point_light(self, position, color, name):
+    def basic_point_light(self, position, color, name, attenuation=(1, 0, 0.02)):
         light = PointLight(name)
         light.setColor(color)
-        plight = self.render.attachNewNode(light)
-        floater = NodePath(PandaNode(name))
-        floater.reparentTo(plight)
-        light_cube = self.loader.loadModel("cuby.gltf")
-        light_cube.setColor(color)
-        light_cube.reparentTo(floater)
-
+        light.setAttenuation(attenuation)
+        # light.setShadowCaster(True)
+        # light.getLens().setNearFar(5, 20)
+        plight = self.centerlight_np.attachNewNode(light)
         plight.setPos(position)
         self.render.setLight(plight)
+
+        light_cube = self.loader.loadModel("cuby.gltf")
+        light_cube.reparentTo(plight)
+        light_cube.setScale(0.25)
+        material = Material()
+        material.setEmission(color)
+        light_cube.setMaterial(material)
 
 
 class Stater:
@@ -151,7 +153,7 @@ class Mover:
         self.world = world
         self.actor = actor
         self.stater = stater
-        self.cf_front = 50
+        self.cf_front = 20
         self.cf_turn = 1000
 
     def straight_walk(self, dt):
