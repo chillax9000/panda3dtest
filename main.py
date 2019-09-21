@@ -24,19 +24,18 @@ class TheWorld(ShowBase):
         for cmd_str, cmd_fn in self.cmd_mgr.mapping.items():
             self.accept(cmd_str, cmd_fn)
 
-        # Load the environment model.
-        self.scene = self.loader.loadModel("models/environment")
-        self.setBackgroundColor(0.53, 0.80, 0.92, 1)
+        # environment
+        self.setBackgroundColor(.92, .98, .96, 1)
+        self.scene = self.loader.loadModel("cuby.gltf")
 
-        # Reparent the model to render.
         self.scene.reparentTo(self.render)
 
-        # Apply scale and position transforms on the model.
-        self.scene.setScale(0.25, 0.25, 0.25)
-        self.scene.setPos(-8, 42, 0)
+        self.scene.setScale(16, 16, 1)
+        self.scene.setZ(-2)
 
+        # actor
         self.cube = self.loader.loadModel("cuby.gltf")
-        self.cube.setColor(.1, .8, .4)
+        self.cube.setColor(.1, .4, .9)
         self.cube.reparentTo(self.render)
 
         self.actor_stater = Stater(self.cube)
