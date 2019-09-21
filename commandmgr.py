@@ -14,6 +14,14 @@ class TheWorldCommandMgr:
             "arrow_left-up": self.arrow_left_released,
             "arrow_right-up": self.arrow_right_released,
             "escape": self.escape,
+            "e": self.e,
+            "s": self.s,
+            "d": self.d,
+            "f": self.f,
+            "e-up": self.e_released,
+            "s-up": self.s_released,
+            "d-up": self.d_released,
+            "f-up": self.f_released,
         }
         self.the_world = the_world
 
@@ -46,3 +54,27 @@ class TheWorldCommandMgr:
 
     def escape(self):
         sys.exit(0)
+
+    def e(self):
+        self.the_world.panda_stater.start_walk("front")
+
+    def s(self):
+        self.the_world.panda_stater.start_walk("left")
+
+    def d(self):
+        self.the_world.panda_stater.start_walk("back")
+
+    def f(self):
+        self.the_world.panda_stater.start_walk("right")
+
+    def e_released(self):
+        self.the_world.panda_stater.stop_walk("front")
+
+    def s_released(self):
+        self.the_world.panda_stater.stop_walk("left")
+
+    def d_released(self):
+        self.the_world.panda_stater.stop_walk("back")
+
+    def f_released(self):
+        self.the_world.panda_stater.stop_walk("right")
