@@ -22,6 +22,10 @@ class TheWorldCommandMgr:
             "s-up": self.s_released,
             "d-up": self.d_released,
             "f-up": self.f_released,
+            "space": self.space,
+            "space-up": self.space_released,
+            "a": self.a,
+            "a-up": self.a_released,
         }
         self.the_world = the_world
         self.actor_stater = None
@@ -82,3 +86,15 @@ class TheWorldCommandMgr:
 
     def f_released(self):
         self.actor_stater.stop_walk("right")
+
+    def space(self):
+        self.actor_stater.start_fly("up")
+
+    def space_released(self):
+        self.actor_stater.stop_fly("up")
+
+    def a(self):
+        self.actor_stater.start_fly("down")
+
+    def a_released(self):
+        self.actor_stater.stop_fly("down")

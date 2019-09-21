@@ -1,13 +1,13 @@
-from math import pi, sin, cos
-
-from direct.actor.Actor import Actor
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
-from panda3d.core import Vec2
+from panda3d.core import Vec2, Vec3, AmbientLight, DirectionalLight, PointLight, NodePath, PandaNode
 
 import commandmgr
 import util
+
+initial_actor_pos = Vec3(0, 0, 0)
+cube_color = (1, 1, 1, 1)
 
 
 class TheWorld(ShowBase):
@@ -16,6 +16,7 @@ class TheWorld(ShowBase):
         self.params = {
             "mouse_x": 0,
             "mouse_y": 0,
+            "actor_pos": initial_actor_pos,
         }
 
         self.disableMouse()
@@ -25,24 +26,44 @@ class TheWorld(ShowBase):
             self.accept(cmd_str, cmd_fn)
 
         # environment
-        self.setBackgroundColor(.92, .98, .96, 1)
+        self.setBackgroundColor(.0, .0, .0, 1)
         self.scene = self.loader.loadModel("cuby.gltf")
+        self.scene.setColor(0, 0, 1, 1)
 
         self.scene.reparentTo(self.render)
 
         self.scene.setScale(16, 16, 1)
         self.scene.setZ(-2)
 
+        # lighting
+        ambient_light = AmbientLight("ambient_light")
+        ambient_light.setColor((.2, .2, .2, 1))
+        alight = self.render.attachNewNode(ambient_light)
+        self.render.setLight(alight)
+
+        d, h = 16, 10
+        self.basic_point_light((-d, 0, h), (.0, .0, .7, 1), "left_light")
+        self.basic_point_light((d, 0, h), (.0, .7, 0, 1), "right_light")
+        self.basic_point_light((0, d, h), (.7, .0, .0, 1), "front_light")
+        self.basic_point_light((0, -d, h), (1, 1, 1, 1), "back_light")
+
+        # directionalLight = DirectionalLight("directionalLight")
+        # directionalLight.setDirection((-5, -5, -5))
+        # directionalLight.setColor((1, 1, 1, 1))
+        # directionalLight.setSpecularColor((1, 1, 1, 1))
+        # self.render.setLight(self.render.attachNewNode(directionalLight))
+
         # actor
-        self.cube = self.loader.loadModel("cuby.gltf")
-        self.cube.setColor(.1, .4, .9)
-        self.cube.reparentTo(self.render)
+        self.actor = self.loader.loadModel("cuby.gltf")
+        self.actor.setColor(cube_color)
+        self.actor.reparentTo(self.render)
+        self.actor.setPos(initial_actor_pos)
 
-        self.actor_stater = Stater(self.cube)
+        self.actor_stater = Stater(self.actor)
         self.cmd_mgr.set_actor_stater(self.actor_stater)
-        self.actor_mover = Mover(self, self.cube, self.actor_stater)
+        self.actor_mover = Mover(self, self.actor, self.actor_stater)
 
-        self.camera.wrtReparentTo(self.cube)
+        self.camera.wrtReparentTo(self.actor)
         self.camera.setPos(0, 40, 10)
         self.camera.lookAt(0, 0, 0)
 
@@ -55,10 +76,24 @@ class TheWorld(ShowBase):
             self.params["mouse_x"] = self.mouseWatcherNode.getMouseX()
             self.params["mouse_y"] = self.mouseWatcherNode.getMouseY()
             self.win.movePointer(0, self.win.getProperties().getXSize() // 2, self.win.getProperties().getYSize() // 2)
+        self.params["actor_pos"] = self.actor.getPos()
         return Task.cont
 
     def log(self, task):
         return Task.cont
+
+    def basic_point_light(self, position, color, name):
+        light = PointLight(name)
+        light.setColor(color)
+        plight = self.render.attachNewNode(light)
+        floater = NodePath(PandaNode(name))
+        floater.reparentTo(plight)
+        light_cube = self.loader.loadModel("cuby.gltf")
+        light_cube.setColor(color)
+        light_cube.reparentTo(floater)
+
+        plight.setPos(position)
+        self.render.setLight(plight)
 
 
 class Stater:
@@ -66,12 +101,18 @@ class Stater:
         self.obj = obj
         self.states = {
             "walk": set(),
+            "jump": False,
+            "fly": set(),
         }
         self.walk_map = {
             "front": Vec2(1, 0),
             "back": Vec2(-1, 0),
             "right": Vec2(0, 1),
             "left": Vec2(0, -1),
+        }
+        self.fly_map = {
+            "up": 1,
+            "down": -1
         }
 
     def start_walk(self, dir="front"):
@@ -89,11 +130,26 @@ class Stater:
         # if not self.states["walk"]:
         #     self.obj.stop()
 
+    def start_fly(self, dir="up"):
+        self.states["fly"].add(self.fly_map[dir])
+
+    def stop_fly(self, dir=None):
+        if not dir:
+            self.states["fly"].clear()
+        elif self.fly_map[dir] in self.states["fly"]:
+            self.states["fly"].remove(self.fly_map[dir])
+
+    def do_jump(self):
+        self.states["jump"] = True
+
+    def end_jump(self):
+        self.states["jump"] = False
+
 
 class Mover:
-    def __init__(self, world, obj, stater):
+    def __init__(self, world, actor, stater):
         self.world = world
-        self.obj = obj
+        self.actor = actor
         self.stater = stater
         self.cf_front = 50
         self.cf_turn = 1000
@@ -101,20 +157,41 @@ class Mover:
     def straight_walk(self, dt):
         v_dir = sum(self.stater.states["walk"], util.VEC2_NULL)
         if v_dir.x:  # front/back
-            self.obj.setY(self.obj, - v_dir.x * self.cf_front * dt)
+            self.actor.setY(self.actor, - v_dir.x * self.cf_front * dt)
         if v_dir.y:  # right/left
-            self.obj.setX(self.obj, - v_dir.y * self.cf_front * dt)
+            self.actor.setX(self.actor, - v_dir.y * self.cf_front * dt)
 
     def turn(self, dt):
         if self.world.mouseWatcherNode.hasMouse():
             if self.world.params["mouse_x"]:
-                self.obj.setH(self.obj.getH() - self.cf_turn * dt * self.world.params["mouse_x"])
+                self.actor.setH(self.actor.getH() - self.cf_turn * dt * self.world.params["mouse_x"])
+
+    def jump(self, dt):
+        self.actor.setZ(self.actor.getZ() + 500 * dt)
+
+    def fly(self, dt):
+        dir = sum(self.stater.states["fly"])
+        if dir:
+            self.actor.setZ(self.actor.getZ() + dir * 5 * dt)
+
+    def gravity(self, dt):
+        actor_z = self.actor.getZ()
+        if actor_z > 0:
+            self.actor.setZ(actor_z - 10 * dt)
+            if self.actor.getZ() < 0:
+                self.actor.setZ(0)
 
     def execute(self, task):
         dt = globalClock.getDt()
         if self.stater.states["walk"]:
             self.straight_walk(dt)
+        if self.stater.states["jump"]:
+            self.jump(dt)
+            self.stater.end_jump()
+        if self.stater.states["fly"]:
+            self.fly(dt)
         self.turn(dt)
+        # self.gravity(dt)
         return Task.cont
 
 
