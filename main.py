@@ -1,13 +1,15 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
-from panda3d.core import Vec2, Vec3, AmbientLight, DirectionalLight, PointLight, NodePath, PandaNode, Material
+from panda3d.core import Vec2, Vec3, AmbientLight, PointLight, Material
 
 import commandmgr
 import util
 
 initial_actor_pos = Vec3(0, 0, 0)
+initial_actor_hpr = Vec3(0, 0, 0)
 cube_color = (1, 1, 1, 1)
+cam_dist = 20
 
 
 class TheWorld(ShowBase):
@@ -16,7 +18,6 @@ class TheWorld(ShowBase):
         self.params = {
             "mouse_x": 0,
             "mouse_y": 0,
-            "actor_pos": initial_actor_pos,
         }
 
         self.disableMouse()
@@ -45,6 +46,7 @@ class TheWorld(ShowBase):
         self.actor.setColor(cube_color)
         self.actor.reparentTo(self.render)
         self.actor.setPos(initial_actor_pos)
+        self.actor.setHpr(initial_actor_hpr)
 
         self.centerlight_np = self.actor.attachNewNode("basiclightcenter")
         self.centerlight_np.hprInterval(4, (360, 0, 0)).loop()
@@ -60,7 +62,7 @@ class TheWorld(ShowBase):
         self.actor_mover = Mover(self, self.actor, self.actor_stater)
 
         self.camera.wrtReparentTo(self.actor)
-        self.camera.setPos(0, 40, 10)
+        self.camera.setPos(Vec3(0, 4, 1).normalized() * cam_dist)
         self.camera.lookAt(0, 0, 0)
 
         self.taskMgr.add(self.update_params, "paramsTask")
@@ -166,7 +168,14 @@ class Mover:
     def turn(self, dt):
         if self.world.mouseWatcherNode.hasMouse():
             if self.world.params["mouse_x"]:
-                self.actor.setH(self.actor.getH() - self.cf_turn * dt * self.world.params["mouse_x"])
+                self.actor.setH(self.actor, - self.cf_turn * dt * self.world.params["mouse_x"])
+            if self.world.params["mouse_y"]:
+                new_z = self.world.camera.getZ() - self.cf_turn * dt * self.world.params["mouse_y"]
+                bound = 20
+                new_z = bound if new_z > bound else new_z
+                new_z = -bound if new_z < -bound else new_z
+                self.world.camera.setZ(new_z)
+                self.world.camera.lookAt(0, 0, 0)
 
     def jump(self, dt):
         self.actor.setZ(self.actor.getZ() + 500 * dt)
