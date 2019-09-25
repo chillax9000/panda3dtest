@@ -1,32 +1,11 @@
 import sys
 
+from input.commandmgr import BaseCommandMgr
 
-class TheWorldCommandMgr:
+
+class TheWorldCommandMgr(BaseCommandMgr):
     def __init__(self, the_world):
-        self.mapping = {
-            "mouse1": self.mouse1,
-            "arrow_up": self.arrow_up,
-            "arrow_down": self.arrow_down,
-            "arrow_left": self.arrow_left,
-            "arrow_right": self.arrow_right,
-            "arrow_up-up": self.arrow_up_released,
-            "arrow_down-up": self.arrow_down_released,
-            "arrow_left-up": self.arrow_left_released,
-            "arrow_right-up": self.arrow_right_released,
-            "escape": self.escape,
-            "e": self.e,
-            "s": self.s,
-            "d": self.d,
-            "f": self.f,
-            "e-up": self.e_released,
-            "s-up": self.s_released,
-            "d-up": self.d_released,
-            "f-up": self.f_released,
-            "space": self.space,
-            "space-up": self.space_released,
-            "a": self.a,
-            "a-up": self.a_released,
-        }
+        super().__init__()
         self.the_world = the_world
         self.actor_stater = None
 
