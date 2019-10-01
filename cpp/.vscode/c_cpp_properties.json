@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64",
+            "compilerArgs": [
+                "-std=gnu++11",
+                "-O2",
+                "-I/usr/include/python3.7m",
+                "-I/usr/include/panda3d"
+            ]
+        }
+    ],
+    "version": 4
+}
