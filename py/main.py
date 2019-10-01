@@ -4,12 +4,13 @@ from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
 from panda3d.core import Vec2, Vec3, AmbientLight, PointLight, Material, CollisionNode, CollisionRay, \
-    CollisionHandlerFloor, CollisionTraverser, CollisionHandlerQueue, CollideMask, CollisionPlane, Plane, Point3
+    CollisionHandlerFloor, CollisionTraverser, CollisionHandlerQueue, CollideMask, CollisionPlane, Plane, Point3, \
+    CollisionSphere, CollisionHandlerPusher, CollisionBox
 
 import commandmgr
 import util
 
-initial_actor_pos = Vec3(0, 0, 2)
+initial_actor_pos = Vec3(0, 0, 1)
 initial_actor_hpr = Vec3(0, 0, 0)
 cube_color = (1, 1, 1, 1)
 cam_dist = 20
@@ -35,6 +36,7 @@ class TheWorld(ShowBase):
         # # ground
         self.ground_cube = self.loader.loadModel("cuby.gltf")
         self.ground_cube.setColor(1, 1, 1, 1)
+        self.ground_cube.setScale(1, 1, .4)
 
         self.ground = self.render.attachNewNode("ground")
 
@@ -49,13 +51,15 @@ class TheWorld(ShowBase):
 
         for x, y in map(normalize, grid_coordinates):
             placeholder = self.ground.attachNewNode("placeholder")
-            placeholder.setPos(x, y, -2)
+            placeholder.setPos(x, y, -.4)
             self.ground_cube.instanceTo(placeholder)
 
-        # # collision ground
-        plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -1)))
-        cnode_path = self.render.attachNewNode(CollisionNode('groundy'))
-        cnode_path.node().addSolid(plane)
+            # collision ground
+            coll_node = CollisionNode(f"ground_{x}_{y}")
+            coll_node.setFromCollideMask(CollideMask.allOff())
+            coll_node.setIntoCollideMask(CollideMask.bit(0))
+            nodepath = placeholder.attachNewNode(coll_node)
+            nodepath.node().addSolid(CollisionBox(Point3(0, 0, 0), 1, 1, .4))
 
         # lighting
         ambient_light = AmbientLight("ambient_light")
@@ -72,18 +76,18 @@ class TheWorld(ShowBase):
 
         # # collision actor
         self.cTrav = CollisionTraverser('traverser')
-
-        self.ground_ray = CollisionRay(0, 0, 0, 0, 0, -1)
-        self.ground_collinode = CollisionNode('ray')
-        self.ground_collinode.addSolid(self.ground_ray)
-        self.ground_collinode_np = self.actor.attachNewNode(self.ground_collinode)
-        self.ground_handler = CollisionHandlerFloor()
-        self.ground_handler.setMaxVelocity(2)
-        self.ground_handler.setOffset(1)
-        self.ground_handler.add_collider(self.ground_collinode_np, self.actor)
-        self.cTrav.addCollider(self.ground_collinode_np, self.ground_handler)
-
         self.cTrav.showCollisions(self.actor)
+
+        self.actor_coll = CollisionNode('actor')
+        self.actor_coll.addSolid(CollisionSphere(center=(0, 0, 0), radius=1))
+        self.actor_coll.setFromCollideMask(CollideMask.bit(0))
+        self.actor_coll.setIntoCollideMask(CollideMask.allOff())
+        self.actor_coll_np = self.actor.attachNewNode(self.actor_coll)
+        self.pusher = CollisionHandlerPusher()
+
+        self.pusher.addCollider(self.actor_coll_np, self.actor)
+        self.cTrav.addCollider(self.actor_coll_np, self.pusher)
+
 
         # lighting
         self.centerlight_np = self.render.attachNewNode("basiclightcenter")
