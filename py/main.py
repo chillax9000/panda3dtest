@@ -1,3 +1,5 @@
+import itertools
+
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
@@ -28,12 +30,26 @@ class TheWorld(ShowBase):
 
         # environment
         self.setBackgroundColor(.0, .0, .0, 1)
-        self.ground = self.loader.loadModel("cuby.gltf")
-        self.ground.setColor(1, 1, 1, 1)
-        self.ground.reparentTo(self.render)
 
-        self.ground.setScale(16, 16, 1)
-        self.ground.setZ(-2)
+        # # ground
+        self.ground_cube = self.loader.loadModel("cuby.gltf")
+        self.ground_cube.setColor(1, 1, 1, 1)
+
+        self.ground = self.render.attachNewNode("ground")
+
+        grid_size = 4
+        grid_max = grid_size - 1
+        dist = 4
+        grid_coordinates = itertools.product(range(grid_size), range(grid_size))
+
+        def normalize(x_y):
+            x, y = x_y
+            return (x - grid_max / 2) * dist, (y - grid_max / 2) * dist
+
+        for x, y in map(normalize, grid_coordinates):
+            placeholder = self.ground.attachNewNode("placeholder")
+            placeholder.setPos(x, y, -2)
+            self.ground_cube.instanceTo(placeholder)
 
         # lighting
         ambient_light = AmbientLight("ambient_light")
@@ -48,7 +64,7 @@ class TheWorld(ShowBase):
         self.actor.setPos(initial_actor_pos)
         self.actor.setHpr(initial_actor_hpr)
 
-        self.centerlight_np = self.actor.attachNewNode("basiclightcenter")
+        self.centerlight_np = self.render.attachNewNode("basiclightcenter")
         self.centerlight_np.hprInterval(4, (360, 0, 0)).loop()
 
         d, h = 2, 0
