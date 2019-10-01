@@ -3,12 +3,13 @@ import itertools
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
-from panda3d.core import Vec2, Vec3, AmbientLight, PointLight, Material
+from panda3d.core import Vec2, Vec3, AmbientLight, PointLight, Material, CollisionNode, CollisionRay, \
+    CollisionHandlerFloor, CollisionTraverser, CollisionHandlerQueue, CollideMask, CollisionPlane, Plane, Point3
 
 import commandmgr
 import util
 
-initial_actor_pos = Vec3(0, 0, 0)
+initial_actor_pos = Vec3(0, 0, 2)
 initial_actor_hpr = Vec3(0, 0, 0)
 cube_color = (1, 1, 1, 1)
 cam_dist = 20
@@ -51,6 +52,11 @@ class TheWorld(ShowBase):
             placeholder.setPos(x, y, -2)
             self.ground_cube.instanceTo(placeholder)
 
+        # # collision ground
+        plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -1)))
+        cnode_path = self.render.attachNewNode(CollisionNode('groundy'))
+        cnode_path.node().addSolid(plane)
+
         # lighting
         ambient_light = AmbientLight("ambient_light")
         ambient_light.setColor((.2, .2, .2, 1))
@@ -64,6 +70,22 @@ class TheWorld(ShowBase):
         self.actor.setPos(initial_actor_pos)
         self.actor.setHpr(initial_actor_hpr)
 
+        # # collision actor
+        self.cTrav = CollisionTraverser('traverser')
+
+        self.ground_ray = CollisionRay(0, 0, 0, 0, 0, -1)
+        self.ground_collinode = CollisionNode('ray')
+        self.ground_collinode.addSolid(self.ground_ray)
+        self.ground_collinode_np = self.actor.attachNewNode(self.ground_collinode)
+        self.ground_handler = CollisionHandlerFloor()
+        self.ground_handler.setMaxVelocity(2)
+        self.ground_handler.setOffset(1)
+        self.ground_handler.add_collider(self.ground_collinode_np, self.actor)
+        self.cTrav.addCollider(self.ground_collinode_np, self.ground_handler)
+
+        self.cTrav.showCollisions(self.actor)
+
+        # lighting
         self.centerlight_np = self.render.attachNewNode("basiclightcenter")
         self.centerlight_np.hprInterval(4, (360, 0, 0)).loop()
 
