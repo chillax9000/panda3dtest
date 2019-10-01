@@ -1,4 +1,5 @@
 import itertools
+import math
 
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
@@ -10,8 +11,8 @@ from panda3d.core import Vec2, Vec3, AmbientLight, PointLight, Material, Collisi
 import commandmgr
 import util
 
-initial_actor_pos = Vec3(0, 0, 1)
-initial_actor_hpr = Vec3(0, 0, 0)
+initial_actor_pos = Point3(0, 0, 1)
+initial_actor_hpr = Point3(0, 0, 0)
 cube_color = (1, 1, 1, 1)
 cam_dist = 20
 
@@ -36,13 +37,14 @@ class TheWorld(ShowBase):
         # # ground
         self.ground_cube = self.loader.loadModel("cuby.gltf")
         self.ground_cube.setColor(1, 1, 1, 1)
-        self.ground_cube.setScale(1, 1, .4)
+        ground_cube_size = Vec3(2, 2, .4)
+        self.ground_cube.setScale(ground_cube_size)
 
         self.ground = self.render.attachNewNode("ground")
 
-        grid_size = 4
+        grid_size = 5
         grid_max = grid_size - 1
-        dist = 4
+        dist = 8
         grid_coordinates = itertools.product(range(grid_size), range(grid_size))
 
         def normalize(x_y):
@@ -51,7 +53,7 @@ class TheWorld(ShowBase):
 
         for x, y in map(normalize, grid_coordinates):
             placeholder = self.ground.attachNewNode("placeholder")
-            placeholder.setPos(x, y, -.4)
+            placeholder.setPos(x, y, -ground_cube_size.z)
             self.ground_cube.instanceTo(placeholder)
 
             # collision ground
@@ -59,7 +61,8 @@ class TheWorld(ShowBase):
             coll_node.setFromCollideMask(CollideMask.allOff())
             coll_node.setIntoCollideMask(CollideMask.bit(0))
             nodepath = placeholder.attachNewNode(coll_node)
-            nodepath.node().addSolid(CollisionBox(Point3(0, 0, 0), 1, 1, .4))
+            nodepath.node().addSolid(
+                CollisionBox(Point3(0, 0, 0), ground_cube_size.x, ground_cube_size.y, ground_cube_size.z))
 
         # lighting
         ambient_light = AmbientLight("ambient_light")
@@ -68,18 +71,16 @@ class TheWorld(ShowBase):
         self.render.setLight(alight)
 
         # actor
-        self.actor = self.loader.loadModel("cuby.gltf")
+        self.actor_obj = Actor(self, self.render, "cuby.gltf")
+        self.actor = self.actor_obj.node
         self.actor.setColor(cube_color)
-        self.actor.reparentTo(self.render)
-        self.actor.setPos(initial_actor_pos)
-        self.actor.setHpr(initial_actor_hpr)
 
         # # collision actor
         self.cTrav = CollisionTraverser('traverser')
         self.cTrav.showCollisions(self.actor)
 
         self.actor_coll = CollisionNode('actor')
-        self.actor_coll.addSolid(CollisionSphere(center=(0, 0, 0), radius=1))
+        self.actor_coll.addSolid(CollisionBox(Point3(0, 0, 0), 1, 1, 1))
         self.actor_coll.setFromCollideMask(CollideMask.bit(0))
         self.actor_coll.setIntoCollideMask(CollideMask.allOff())
         self.actor_coll_np = self.actor.attachNewNode(self.actor_coll)
@@ -88,12 +89,11 @@ class TheWorld(ShowBase):
         self.pusher.addCollider(self.actor_coll_np, self.actor)
         self.cTrav.addCollider(self.actor_coll_np, self.pusher)
 
-
         # lighting
         self.centerlight_np = self.render.attachNewNode("basiclightcenter")
         self.centerlight_np.hprInterval(4, (360, 0, 0)).loop()
 
-        d, h = 2, 0
+        d, h = 8, 1
         self.basic_point_light((-d, 0, h), (.0, .0, .7, 1), "left_light")
         self.basic_point_light((d, 0, h), (.0, .7, 0, 1), "right_light")
         self.basic_point_light((0, d, h), (.7, .0, .0, 1), "front_light")
@@ -101,7 +101,7 @@ class TheWorld(ShowBase):
 
         self.actor_stater = Stater(self.actor)
         self.cmd_mgr.set_actor_stater(self.actor_stater)
-        self.actor_mover = Mover(self, self.actor, self.actor_stater)
+        self.actor_mover = Mover(self, self.actor_obj, self.actor_stater)
 
         self.camera.wrtReparentTo(self.actor)
         self.camera.setPos(Vec3(0, 4, 1).normalized() * cam_dist)
@@ -193,9 +193,10 @@ class Stater:
 
 
 class Mover:
-    def __init__(self, world, actor, stater):
+    def __init__(self, world, actor_obj, stater):
         self.world = world
-        self.actor = actor
+        self.actor_obj = actor_obj
+        self.actor = self.actor_obj.node
         self.stater = stater
         self.cf_front = 20
         self.cf_turn = 1000
@@ -220,19 +221,13 @@ class Mover:
                 self.world.camera.lookAt(0, 0, 0)
 
     def jump(self, dt):
-        self.actor.setZ(self.actor.getZ() + 500 * dt)
+        self.actor_obj.apply_force(self.actor_obj.VEC_JUMP_FORCE)
+        self.stater.end_jump()
 
     def fly(self, dt):
         dir = sum(self.stater.states["fly"])
         if dir:
             self.actor.setZ(self.actor.getZ() + dir * 5 * dt)
-
-    def gravity(self, dt):
-        actor_z = self.actor.getZ()
-        if actor_z > 0:
-            self.actor.setZ(actor_z - 10 * dt)
-            if self.actor.getZ() < 0:
-                self.actor.setZ(0)
 
     def execute(self, task):
         dt = globalClock.getDt()
@@ -240,12 +235,57 @@ class Mover:
             self.straight_walk(dt)
         if self.stater.states["jump"]:
             self.jump(dt)
-            self.stater.end_jump()
         if self.stater.states["fly"]:
             self.fly(dt)
         self.turn(dt)
-        # self.gravity(dt)
+        if self.actor.getZ() > initial_actor_pos.z:
+            self.actor_obj.apply_gravity()
+        else:
+            self.actor_obj.v = util.VEC3_NULL
+        self.actor_obj.move(dt)
         return Task.cont
+
+
+class Actor:
+    VEC_GRAVITY_FORCE = Vec3(0, 0, -1)
+    VEC_JUMP_FORCE = Vec3(0, 0, 200)
+
+    def __init__(self, world, parent, model_path=None, init_pos=initial_actor_pos, init_hpr=initial_actor_hpr, mass=1):
+        self.world = world
+        self.node = (self.world.loader.loadModel(model_path) if model_path
+                     else self.world.render.AttachNewNode(model_path))
+        self.node.reparentTo(parent)
+
+        self.node.setPos(init_pos)
+        self.node.setHpr(init_hpr)
+
+        self.v = util.VEC3_NULL
+        self.a = util.VEC3_NULL
+        self.m = mass
+
+        self.forces = []
+
+    def apply_force(self, vec_force):
+        self.forces.append(vec_force)
+
+    def apply_gravity(self):
+        self.apply_force(self.VEC_GRAVITY_FORCE)
+
+    def compute_accel(self):
+        self.a = sum(self.forces, util.VEC3_NULL) / self.m
+        self.forces = []
+
+    def compute_speed(self):
+        self.v = self.v + self.a.normalized() * math.sqrt(self.a.length()) * 2 * self.m
+
+    def compute_position(self, dt):
+        self.node.setPos(self.node.getPos() + self.v * dt)
+
+    def move(self, dt):
+        self.compute_accel()
+        self.compute_speed()
+        self.compute_position(dt)
+        print(self.a, self.v, self.node.getPos())
 
 
 app = TheWorld()

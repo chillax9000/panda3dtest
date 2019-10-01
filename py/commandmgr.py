@@ -67,13 +67,13 @@ class TheWorldCommandMgr(BaseCommandMgr):
         self.actor_stater.stop_walk("right")
 
     def space(self):
-        self.actor_stater.start_fly("up")
+        self.actor_stater.do_jump()
 
-    def space_released(self):
-        self.actor_stater.stop_fly("up")
-
-    def a(self):
-        self.actor_stater.start_fly("down")
-
-    def a_released(self):
-        self.actor_stater.stop_fly("down")
+    # def space_released(self):
+    #     self.actor_stater.stop_fly("up")
+    #
+    # def a(self):
+    #     self.actor_stater.start_fly("down")
+    #
+    # def a_released(self):
+    #     self.actor_stater.stop_fly("down")
