@@ -11,10 +11,13 @@ from panda3d.core import Vec2, Vec3, AmbientLight, PointLight, Material, Collisi
 import commandmgr
 import util
 
-initial_actor_pos = Point3(0, 0, 1)
+initial_actor_pos = Point3(0, 0, 10)
 initial_actor_hpr = Point3(0, 0, 0)
 cube_color = (1, 1, 1, 1)
 cam_dist = 20
+DEATH_DEPTH = -25
+GRID_SIZE = 1
+ground_cube_size = Vec3(10, 10, .4)
 
 
 class TheWorld(ShowBase):
@@ -37,15 +40,13 @@ class TheWorld(ShowBase):
         # # ground
         self.ground_cube = self.loader.loadModel("cuby.gltf")
         self.ground_cube.setColor(1, 1, 1, 1)
-        ground_cube_size = Vec3(2, 2, .4)
         self.ground_cube.setScale(ground_cube_size)
 
         self.ground = self.render.attachNewNode("ground")
 
-        grid_size = 5
-        grid_max = grid_size - 1
+        grid_max = GRID_SIZE - 1
         dist = 8
-        grid_coordinates = itertools.product(range(grid_size), range(grid_size))
+        grid_coordinates = itertools.product(range(GRID_SIZE), range(GRID_SIZE))
 
         def normalize(x_y):
             x, y = x_y
@@ -77,23 +78,27 @@ class TheWorld(ShowBase):
 
         # # collision actor
         self.cTrav = CollisionTraverser('traverser')
-        self.cTrav.showCollisions(self.actor)
+        # self.cTrav.showCollisions(self.actor)
 
         self.actor_coll = CollisionNode('actor')
         self.actor_coll.addSolid(CollisionBox(Point3(0, 0, 0), 1, 1, 1))
         self.actor_coll.setFromCollideMask(CollideMask.bit(0))
         self.actor_coll.setIntoCollideMask(CollideMask.allOff())
         self.actor_coll_np = self.actor.attachNewNode(self.actor_coll)
-        self.pusher = CollisionHandlerPusher()
 
-        self.pusher.addCollider(self.actor_coll_np, self.actor)
-        self.cTrav.addCollider(self.actor_coll_np, self.pusher)
+        # self.pusher = CollisionHandlerPusher()
+        #
+        # self.pusher.addCollider(self.actor_coll_np, self.actor)
+        # self.cTrav.addCollider(self.actor_coll_np, self.pusher)
+
+        self.queue = CollisionHandlerQueue()
+        self.cTrav.addCollider(self.actor_coll_np, self.queue)
 
         # lighting
         self.centerlight_np = self.render.attachNewNode("basiclightcenter")
-        self.centerlight_np.hprInterval(4, (360, 0, 0)).loop()
+        self.centerlight_np.hprInterval(8, (360, 0, 0)).loop()
 
-        d, h = 8, 1
+        d, h = 10, 1
         self.basic_point_light((-d, 0, h), (.0, .0, .7, 1), "left_light")
         self.basic_point_light((d, 0, h), (.0, .7, 0, 1), "right_light")
         self.basic_point_light((0, d, h), (.7, .0, .0, 1), "front_light")
@@ -151,10 +156,10 @@ class Stater:
             "fly": set(),
         }
         self.walk_map = {
-            "front": Vec2(1, 0),
-            "back": Vec2(-1, 0),
-            "right": Vec2(0, 1),
-            "left": Vec2(0, -1),
+            "front": Vec3(0, -1, 0),
+            "back": Vec3(0, 1, 0),
+            "right": Vec3(-1, 0, 0),
+            "left": Vec3(1, 0, 0),
         }
         self.fly_map = {
             "up": 1,
@@ -202,11 +207,10 @@ class Mover:
         self.cf_turn = 1000
 
     def straight_walk(self, dt):
-        v_dir = sum(self.stater.states["walk"], util.VEC2_NULL)
-        if v_dir.x:  # front/back
-            self.actor.setY(self.actor, - v_dir.x * self.cf_front * dt)
-        if v_dir.y:  # right/left
-            self.actor.setX(self.actor, - v_dir.y * self.cf_front * dt)
+        v_dir = sum(self.stater.states["walk"], util.VEC3_NULL)
+        if v_dir.xy:
+            self.actor_obj.v = Vec3(bound_velocity(self.actor_obj.v.xy + v_dir.xy, Actor.WALK_VELOCITY_MAX),
+                                    self.actor_obj.v.z)
 
     def turn(self, dt):
         if self.world.mouseWatcherNode.hasMouse():
@@ -229,26 +233,53 @@ class Mover:
         if dir:
             self.actor.setZ(self.actor.getZ() + dir * 5 * dt)
 
+    def die(self):
+        self.actor.setPos(initial_actor_pos)
+        self.actor_obj.v = util.VEC3_NULL
+        self.actor_obj.forces = []
+        self.actor_obj.a = util.VEC3_NULL
+        self.actor_obj.last_known_pos = initial_actor_pos
+
     def execute(self, task):
         dt = globalClock.getDt()
-        if self.stater.states["walk"]:
-            self.straight_walk(dt)
-        if self.stater.states["jump"]:
-            self.jump(dt)
-        if self.stater.states["fly"]:
-            self.fly(dt)
-        self.turn(dt)
-        if self.actor.getZ() > initial_actor_pos.z:
-            self.actor_obj.apply_gravity()
+        if self.actor.getZ() < DEATH_DEPTH:
+            self.die()
         else:
-            self.actor_obj.v = util.VEC3_NULL
-        self.actor_obj.move(dt)
+            grounded = False
+            for entry in self.world.queue.getEntries():
+                if entry.getSurfaceNormal(self.world.ground).z > 0:
+                    grounded = True
+                    self.actor.setZ(1)
+                    self.actor_obj.v.z = 0
+                    break
+
+            if self.stater.states["walk"]:
+                self.straight_walk(dt)
+            if self.stater.states["jump"]:
+                self.jump(dt)
+            if self.stater.states["fly"]:
+                self.fly(dt)
+            self.turn(dt)
+            if grounded:
+                ground_friction = 0 if self.stater.states["walk"] else 10
+                self.actor_obj.apply_force(-Vec3(self.actor_obj.v.xy, 0) * ground_friction)
+            else:
+                self.actor_obj.apply_gravity()
+
+            self.actor_obj.move(dt)
         return Task.cont
 
 
+def bound_velocity(v, max):
+    return v.normalized() * max if v.lengthSquared() > max * max else v
+
+
 class Actor:
-    VEC_GRAVITY_FORCE = Vec3(0, 0, -1)
-    VEC_JUMP_FORCE = Vec3(0, 0, 200)
+    VEC_GRAVITY_FORCE = Vec3(0, 0, -10)
+    VEC_JUMP_FORCE = Vec3(0, 0, 400)
+    WALK_VELOCITY_MAX = 10
+    VELOCITY_MAX = 50
+    VELOCITY_MAX_SQUARED = VELOCITY_MAX * VELOCITY_MAX
 
     def __init__(self, world, parent, model_path=None, init_pos=initial_actor_pos, init_hpr=initial_actor_hpr, mass=1):
         self.world = world
@@ -263,6 +294,8 @@ class Actor:
         self.a = util.VEC3_NULL
         self.m = mass
 
+        self.last_known_pos = init_pos
+
         self.forces = []
 
     def apply_force(self, vec_force):
@@ -275,17 +308,21 @@ class Actor:
         self.a = sum(self.forces, util.VEC3_NULL) / self.m
         self.forces = []
 
-    def compute_speed(self):
-        self.v = self.v + self.a.normalized() * math.sqrt(self.a.length()) * 2 * self.m
+    def compute_speed(self, dt):
+        self.v = bound_velocity(self.v + self.a * dt, self.VELOCITY_MAX)
+        if self.v.lengthSquared() < 0.01:
+            self.v = util.VEC3_NULL
 
     def compute_position(self, dt):
-        self.node.setPos(self.node.getPos() + self.v * dt)
+        current_pos = self.node.getPos()
+        self.last_known_pos = current_pos
+        self.node.setPos(self.node, self.v * dt)
 
     def move(self, dt):
         self.compute_accel()
-        self.compute_speed()
+        self.compute_speed(dt)
         self.compute_position(dt)
-        print(self.a, self.v, self.node.getPos())
+        print({"accel": self.a, "velocity": self.v})
 
 
 app = TheWorld()
