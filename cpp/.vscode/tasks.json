@@ -15,8 +15,18 @@
         },
         {
             "type": "shell",
-            "label": "build",
+            "label": "link",
             "command": "g++ build/main.o -o build/main -L/usr/lib/x86_64-linux-gnu/panda3d -pthread -lp3framework -lpanda -lpandafx -lpandaexpress -lp3dtoolconfig -lp3dtool -lp3pystub -lp3direct",
+            "args": [],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "shell",
+            "label": "launch",
+            "command": "./build/main",
             "args": [],
             "problemMatcher": [
                 "$gcc"

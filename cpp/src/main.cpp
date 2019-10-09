@@ -7,6 +7,7 @@
 #include "cIntervalManager.h"
 #include "cLerpNodePathInterval.h"
 #include "cMetaInterval.h"
+#include "eventHandler.h"
  
 // Global stuff
 PT(AsyncTaskManager) taskMgr = AsyncTaskManager::get_global_ptr(); 
@@ -29,14 +30,17 @@ int main(int argc, char *argv[]) {
   PandaFramework framework;
   framework.open_framework(argc, argv);
   framework.set_window_title("My Panda3D Window");
- 
+
   // Open the window
   WindowFramework *window = framework.open_window();
   camera = window->get_camera_group(); // Get the camera and store it
+
+  // user events
+  window->enable_keyboard();
+  framework.define_key("escape", "exit", [](const Event *, void *) {exit(0);}, NULL);
  
   // Load the environment model
-  NodePath scene = window->load_model(framework.get_models(),
-    "models/environment");
+  NodePath scene = window->load_model(framework.get_models(),"models/environment");
   scene.reparent_to(window->get_render());
   scene.set_scale(0.25 , 0.25, 0.25);
   scene.set_pos(-8, 42, 0);
@@ -48,8 +52,8 @@ int main(int argc, char *argv[]) {
   pandaActor.reparent_to(window->get_render());
  
   // Load the walk animation
-  window->load_model(pandaActor, "models/panda-walk4");
-  window->loop_animations(0);
+  // window->load_model(pandaActor, "models/panda-walk4");
+  // window->loop_animations(0);
  
   // Create the lerp intervals needed to walk back and forth
   PT(CLerpNodePathInterval) pandaPosInterval1, pandaPosInterval2,
